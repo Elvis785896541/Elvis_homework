@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: httpserver
+  namespace: httpserver
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+     app: httpserver
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "80"
+      labels:
+        app: httpserver
+    spec:
+      containers:
+      - name: httpserver
+        image: elvis1298/httpserver:v1.0
+        ports:
+            - containerPort: 9090
+        env:
+          - name: HOST
+            valueFrom:
+              configMapKeyRef:
+                key: hostname
+                name: cm
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh","-c","sleep 1"]    
+        startupProbe:
+          httpGet:
+            port: 9090
+            path: /healthz
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 1
+        readinessProbe:
+          httpGet:
+            port: 9090
+            path: /healthz
+          periodSeconds: 5
+          timeoutSeconds: 1
+        livenessProbe:
+          httpGet:
+            port: 9090
+            path: /healthz
+          periodSeconds: 5
+          timeoutSeconds: 1
+        resources:
+          limits:
+            memory: 256Mi
+            cpu: 200m
+          requests:
+            memory: 128Mi
+            cpu: 100m
+---            
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: default
+  name: httpserver
+  labels:
+    app: httpserver
+spec:
+  type: NodePort
+  ports:
+    - protocol: TCP
+      port: 9090
+      nodePort: 30100
+      targetPort: 9090
+      name: http
+  selector:
+    app: httpserver
